@@ -15,11 +15,11 @@ import java.util.ArrayList;
 
 public class Loader extends PApplet {
 
-    static String search = "https://de.wikipedia.org/wiki/Hauskatze";
+    static String search = "https://de.wikipedia.org/wiki/Hongkong";
     static String imagelist = "https://de.wikipedia.org/w/api.php?action=query&prop=images&format=json&formatversion=2&titles=";
     static String imagedetails = "https://de.wikipedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&format=json&formatversion=2&titles=Image:";
 
-    static int limit = 6;
+    static int limit = 15;
 
     //===========================================================================
 // GLOBAL VARIABLES:
@@ -80,11 +80,15 @@ public static void main(String[] args) {
         values=parseJSONObject(get.getContent());
         JSONArray imgs=values.getJSONObject("query").getJSONArray("pages").getJSONObject(0).getJSONArray("images");
 
+
+        for (int i = 0; i < imgs.size(); i++) {
+            if (imgs.getJSONObject(i).getString("title").endsWith("ogv") || imgs.getJSONObject(i).getString("title").endsWith("svg"))  // keine ogv Dateien (= Videos)
+                imgs.remove(i);
+        }
+
         if (imgs!=null) {
 
             for (int i=0; i < imgs.size() && i<limit; i++) {
-                if(imgs.getJSONObject(i).getString("title").endsWith("ogv"))  // keine ogv Dateien (= Videos)
-                    imgs.remove(i);
                 String imageFileName = imgs.getJSONObject(i).getString("title");
                 imageFileName = fixFilename(imageFileName);           // Entferne alles nach "Datei: / File:" + Ersetze Leerzeichen mit "_"
 
@@ -159,7 +163,7 @@ public static void main(String[] args) {
             strokeWeight(3);
             for (int x=0; x<ncol; x++) {
 
-                for (int y=0; y<nrow && ctr<limit; y++) {
+                for (int y=0; y<nrow && ctr<nImages; y++) {
 
                     rect(posx, posy, dw, dh);
                     if (picked && isOverImage(posx, posy, dw, dh))
