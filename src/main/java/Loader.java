@@ -5,8 +5,6 @@ import processing.data.JSONArray;
 import processing.data.JSONObject;
 import processing.data.StringList;
 
-import java.net.URLEncoder;
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 
 
@@ -17,18 +15,11 @@ import java.util.ArrayList;
 
 public class Loader extends PApplet {
 
+    static String search = "https://de.wikipedia.org/wiki/Hauskatze";
+    static String imagelist = "https://de.wikipedia.org/w/api.php?action=query&prop=images&format=json&formatversion=2&titles=";
+    static String imagedetails = "https://de.wikipedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&format=json&formatversion=2&titles=Image:";
 
-//         *-- Base on the follwing url: https:// en.wikipedia.org/wiki/Albert_Einstein
-//         *-- This program reads all the images in the requested link and not more
-//         *-- set by the limit MAX_IMGS.
-//         *-- Click on any image to zoom in. Second click to go back to tiles.
-
-
-    static String WIKI_PAGE="Cat";  //"Art";
-    static String WIKIPEDIA_IMAGES_QUERY_LIST="https://en.wikipedia.org/w/api.php?action=query&prop=images&format=json&formatversion=2&titles=";
-    static String WIKIPEDIA_IMAGE_QUERY_URL="https://en.wikipedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&format=json&formatversion=2&titles=Image:";
-
-    static int limit=30;
+    static int limit = 6;
 
     //===========================================================================
 // GLOBAL VARIABLES:
@@ -40,11 +31,15 @@ public class Loader extends PApplet {
     int cIdx=-1;
 
 
+
+
 //===========================================================================
 // PROCESSING DEFAULT FUNCTIONS:
 public static void main(String[] args) {
 
-    System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.client.protocol.ResponseProcessCookies", "fatal");
+    for (int i = 0; i < 4; i++) {
+        search = search.substring(search.indexOf("/") + 1);
+    }
 
     PApplet.main("Loader");
 }
@@ -79,33 +74,32 @@ public static void main(String[] args) {
 
         GetRequest get;
         JSONObject values;
-        get = new GetRequest(WIKIPEDIA_IMAGES_QUERY_LIST+htmlCustomFormatter(WIKI_PAGE));
+        get = new GetRequest(imagelist + search);
         get.send();
 
         values=parseJSONObject(get.getContent());
         JSONArray imgs=values.getJSONObject("query").getJSONArray("pages").getJSONObject(0).getJSONArray("images");
 
         if (imgs!=null) {
-            int n=values.getJSONObject("query").getJSONArray("pages").getJSONObject(0).getJSONArray("images").size();
 
-
-
-            for (int i=0; i<n && i<limit; i++) {
-                String imageFileName=imgs.getJSONObject(i).getString("title");
-                imageFileName=getFileName(imageFileName);           //Remove "File:"
-                imageFileName=htmlCustomFormatter(imageFileName);   //Remove white spaces from URL
-                println("Image "+i+"=> "+imgs.getJSONObject(i).getString("title"));
+            for (int i=0; i < imgs.size() && i<limit; i++) {
+                if(imgs.getJSONObject(i).getString("title").endsWith("ogv"))  // keine ogv Dateien (= Videos)
+                    imgs.remove(i);
+                String imageFileName = imgs.getJSONObject(i).getString("title");
+                imageFileName = fixFilename(imageFileName);           // Entferne alles nach "Datei: / File:" + Ersetze Leerzeichen mit "_"
 
                 String urlStr=null;
                 PImage loadedImg=null;
-                if (imageFileName.endsWith("jpg") || imageFileName.endsWith("png") || imageFileName.endsWith("tif")) {
-                    get = new GetRequest(WIKIPEDIA_IMAGE_QUERY_URL+imageFileName);
+
+                if (imageFileName.endsWith("jpg") || imageFileName.endsWith("png") || imageFileName.endsWith("tif") || imageFileName.endsWith("JPG") || imageFileName.endsWith("jpeg")) {
+                    get = new GetRequest(imagedetails +imageFileName);
                     get.send();
 
-                    JSONObject res=parseJSONObject(get.getContent());
+                    JSONObject res = parseJSONObject(get.getContent());
                     urlStr=res.getJSONObject("query").getJSONArray("pages").getJSONObject(0).getJSONArray("imageinfo").getJSONObject(0).getString("url");
                     loadedImg=loadImage(urlStr);
                 }
+
                 imgsURL.append(urlStr);
                 imgsBin.add(loadedImg);
                 println("........... ", urlStr);
@@ -168,7 +162,7 @@ public static void main(String[] args) {
                 for (int y=0; y<nrow && ctr<limit; y++) {
 
                     rect(posx, posy, dw, dh);
-                    if (picked==true && isOverImage(posx, posy, dw, dh))
+                    if (picked && isOverImage(posx, posy, dw, dh))
                         cIdx=ctr;
                     showImage(ctr++, posx, posy, dw, dh);
 
@@ -194,51 +188,12 @@ public static void main(String[] args) {
     }
 
 
-    String getFileName(String in) {
-        boolean goodValue=in.startsWith("File:");
-        String ret=null;
+    String fixFilename(String in) {
+        String ret = in.substring(in.indexOf(":")+1);
+        ret = ret.replaceAll("\s", "_");
 
-        if (goodValue) ret=in.substring(in.indexOf(":")+1);
-
-        println("Requisting image: "+ret);
+        println("Requesting image: "+ ret);
         return  ret;
-    }
 
-    //REFERENCE: https:// stackoverflow.com/questions/30998288/php-how-to-replace-special-characters-for-url
-    String htmlCustomFormatter(String in) {
-        boolean goodValue=in!=null;
-        String ret=null;
-
-        //  $specChars = array(
-        //    '!' => '%21',    '"' => '%22',
-        //    '#' => '%23',    '$' => '%24',    '%' => '%25',
-        //    '&' => '%26',    '\'' => '%27',   '(' => '%28',
-        //    ')' => '%29',    '*' => '%2A',    '+' => '%2B',
-        //    ',' => '%2C',    '-' => '%2D',    '.' => '%2E',
-        //    '/' => '%2F',    ':' => '%3A',    ';' => '%3B',
-        //    '<' => '%3C',    '=' => '%3D',    '>' => '%3E',
-        //    '?' => '%3F',    '@' => '%40',    '[' => '%5B',
-        //    '\\' => '%5C',   ']' => '%5D',    '^' => '%5E',
-        //    '_' => '%5F',    '`' => '%60',    '{' => '%7B',
-        //    '|' => '%7C',    '}' => '%7D',    '~' => '%7E',
-        //    ',' => '%E2%80%9A',  ' ' => '%20'
-        //);
-
-
-
-        if (goodValue) {
-
-            //ret=in.replaceAll(" ", "%20");
-
-            try {
-                ret=URLEncoder.encode(in, "UTF-8");  //Also PApplet.encoder()
-            }
-            catch(UnsupportedEncodingException e) {
-                e.printStackTrace();
-            }
-        }
-
-        //println("Requisting image(formatted): "+ret);
-        return  ret;
     }
 }
